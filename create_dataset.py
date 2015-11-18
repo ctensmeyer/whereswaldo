@@ -20,7 +20,7 @@ def parse_args():
 				help="File containing paths to each sprite")
 	parser.add_argument("--sprite-out-dir", default="data/images/augmented_sprites",
 				help="Output directory where the augmented sprites will be written")
-	parser.add_argument("--sprite-no-cache", type=bool, default=False, action="store_true",
+	parser.add_argument("--sprite-no-cache", default=False, action="store_true",
 				help="By default use any precomputed augmented sprites")
 
 	parser.add_argument("-d", "--data-manifest", default='training_images.txt', 
@@ -29,7 +29,7 @@ def parse_args():
 				help="Output directory where the random crops are put")
 	parser.add_argument("-n", "--num-crops", default=10000, type=int, 
 				help="Number of random crops taken from each training image")
-	parser.add_argument("--crops-no-cache", type=bool, default=False, action="store_true",
+	parser.add_argument("--crops-no-cache", default=False, action="store_true",
 				help="By default use previously computed random crops")
 
 	parser.add_argument("-p", "--percent-positive", default=0.5, type=float, 
