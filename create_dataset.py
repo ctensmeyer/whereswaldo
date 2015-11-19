@@ -2,6 +2,7 @@
 import os
 import sys
 import argparse
+import random
 
 from skimage import io
 
@@ -11,10 +12,9 @@ MAX_OCCLUSION_BB_AREA = 1
 
 IMAGE_SCALES = [0.5, 0.75, 1, 1.25, 1.5, 2]
 CROP_SIZE = (170, 85)
-WALDO_SIZES=[
 
 #Read in file of filenames
-def loadFileNames(txt_file, root=""):
+def loadFileNames(txt_file, root="."):
     names = []
     with open(txt_file, 'r') as f:
         for line in f:
@@ -22,23 +22,44 @@ def loadFileNames(txt_file, root=""):
 
     return names
 
-def getSprites(root, in_file, out_file, no_cache):
+def randomBeta(low, high, beta,alpha):
+    return (random.betavariate(alpha,beta)* (high-low)) + low
+
+def createSprites(num_sprites, root, in_file, out_folder):
     filenames = loadFileNames(in_file, root)
     
-    for fn in filenames:
+    out = out_folder + "/"
+    for i in xrange(num_sprites):
+        fn = random.choice(filenames)
         sprite = io.imread(fn)
+        sh = sprite.shape
+
+        #Drop alpha box on spite. 
+        startY = randomBeta(sh[0]/4.0, sh[0], 5,1)
+        startX = randomBeta(0, sh[1], 5,1) #More likely to start square on left side of image.
+
+        endY = randomBeta(startY, sh[0], 0.5,5)
+        endX = randomBeta(startX, sh[1], 0.5, 5)
+
+        sprite[startY:endY, startX:endX, 3] = 0
         
+        io.imsave(out + "spite_%d.png" % (i), sprite)
+
+          
+ 
+def getSprites(num_sprites, root, in_file, out_file, no_cache):
+    createSprites(num_sprites, root, in_file, out_file)       
     
 
 def main(args):
-    sprites = getSprites(args.root, args.sprite_in_file, args.sprite_out_dir, args.sprite_no_cache)
+    sprites = getSprites(args.num_sprites, args.root, args.sprite_in_file, args.sprite_out_dir, args.sprite_no_cache)
 
 
 def parse_args():
 	parser = argparse.ArgumentParser(description="Creates a dataset")
-	parser.add_argument("-r", "--root", default='.', 
+	parser.add_argument("-r", "--root", default='data', 
 				help="All filepaths are relative to the root")
-	parser.add_argument("--sprite-in-file", default="original_sprites.txt", 
+	parser.add_argument("--sprite-in-file", default="data/original_sprites.txt", 
 				help="File containing paths to each sprite")
 	parser.add_argument("--sprite-out-dir", default="data/images/augmented_sprites",
 				help="Output directory where the augmented sprites will be written")
@@ -47,7 +68,7 @@ def parse_args():
 	parser.add_argument("-s", "--num-sprites", default=20, type=int, 
 				help="Number of random occlusions applied to each sprite")
 
-	parser.add_argument("-d", "--data-manifest", default='training_images.txt', 
+	parser.add_argument("-d", "--data-manifest", default='data/training_images.txt', 
 				help="File containing paths to each training image")
 	parser.add_argument("--crop-out-dir", default="data/images/random_crops",
 				help="Output directory where the random crops are put")
