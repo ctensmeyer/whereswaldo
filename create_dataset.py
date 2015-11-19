@@ -16,12 +16,14 @@ def parse_args():
 	parser = argparse.ArgumentParser(description="Creates a dataset")
 	parser.add_argument("-r", "--root", default='.', 
 				help="All filepaths are relative to the root")
-	parser.add_argument("-s", "--sprite-in-file", default="original_sprites.txt", 
+	parser.add_argument("--sprite-in-file", default="original_sprites.txt", 
 				help="File containing paths to each sprite")
 	parser.add_argument("--sprite-out-dir", default="data/images/augmented_sprites",
 				help="Output directory where the augmented sprites will be written")
 	parser.add_argument("--sprite-no-cache", default=False, action="store_true",
 				help="By default use any precomputed augmented sprites")
+	parser.add_argument("-s", "--num-sprites", default=20, type=int, 
+				help="Number of random occlusions applied to each sprite")
 
 	parser.add_argument("-d", "--data-manifest", default='training_images.txt', 
 				help="File containing paths to each training image")
