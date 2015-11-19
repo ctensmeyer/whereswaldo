@@ -1,0 +1,14 @@
+Train/Waldo/waldo_face.png
+Train/Waldo/waldo_head.png
+Train/Waldo/waldo_pose_10.png
+Train/Waldo/waldo_pose_11.png
+Train/Waldo/waldo_pose_12.png
+Train/Waldo/waldo_pose_2.png
+Train/Waldo/waldo_pose_3.png
+Train/Waldo/waldo_pose_4.png
+Train/Waldo/waldo_pose_5.png
+Train/Waldo/waldo_pose_6.png
+Train/Waldo/waldo_pose_7.png
+Train/Waldo/waldo_pose_8.png
+Train/Waldo/waldo_pose_9.png
+Train/Waldo/waldo_pose.png
