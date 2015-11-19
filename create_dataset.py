@@ -3,17 +3,32 @@ import os
 import sys
 import argparse
 
+from skimage import io
+
 SPRITE_OCCLUSION_HEIGHT = 0.75
 MIN_OCCLUSION_BB_AREA = 0.1
 MAX_OCCLUSION_BB_AREA = 1
 
 IMAGE_SCALES = [0.5, 0.75, 1, 1.25, 1.5, 2]
-CROP_SIZE = (170, 80)
+CROP_SIZE = (170, 85)
+WALDO_SIZES=[
 
+#Read in file of filenames
+def loadFileNames(txt_file, root=""):
+    names = []
+    with open(txt_file, 'r') as f:
+        for line in f:
+            names.append(root + "/" + line.strip())
+
+    return names
 
 def getSprites(root, in_file, out_file, no_cache):
-    pass
-
+    filenames = loadFileNames(in_file, root)
+    
+    for fn in filenames:
+        sprite = io.imread(fn)
+        
+    
 
 def main(args):
     sprites = getSprites(args.root, args.sprite_in_file, args.sprite_out_dir, args.sprite_no_cache)
