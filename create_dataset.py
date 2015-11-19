@@ -11,6 +11,13 @@ IMAGE_SCALES = [0.5, 0.75, 1, 1.25, 1.5, 2]
 CROP_SIZE = (170, 80)
 
 
+def getSprites(root, in_file, out_file, no_cache):
+    pass
+
+
+def main(args):
+    sprites = getSprites(args.root, args.sprite_in_file, args.sprite_out_dir, args.sprite_no_cache)
+
 
 def parse_args():
 	parser = argparse.ArgumentParser(description="Creates a dataset")
