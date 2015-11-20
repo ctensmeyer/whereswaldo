@@ -6,8 +6,9 @@ import random
 import shutil
 import argparse
 import numpy as np
+import warnings
 
-from skimage import io, transform
+from skimage import io, transform, filters
 
 SPRITE_OCCLUSION_HEIGHT = 0.75
 MIN_OCCLUSION_BB_AREA = 0.1
@@ -43,6 +44,11 @@ def createSprites(num_sprites, root, in_file, out_folder):
         fn = random.choice(filenames)
         sprite = io.imread(fn)
         sh = sprite.shape
+
+        #Fix alpha channel
+        threshold = filters.threshold_otsu(sprite[:,:,3])
+        sprite[sprite[:,:,3] < threshold] = 0
+        sprite[sprite[:,:,3] >= threshold, 3] = 255
 
         #Drop alpha box on spite. 
         startY = randomBeta(sh[0]*SPRITE_OCCLUSION_HEIGHT, sh[0], 5,1)
@@ -91,31 +97,34 @@ def createCrops(num_crops, root, in_file, out_folder):
     if not QUIET:
         print "Generating %d crops:" % (num_crops)
 
-    out = out_folder + "/"
-    for i in xrange(num_crops):
-        if i % 100 == 0 and not QUIET:
-            print "Processed: %d" % (i)
-        img = random.choice(images)
-        sh = img.shape
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+    
+        out = out_folder + "/"
+        for i in xrange(num_crops):
+            if i % 100 == 0 and not QUIET:
+                print "Processed: %d" % (i)
+            img = random.choice(images)
+            sh = img.shape
 
-        x = random.randrange(0, sh[1] - CROP_SIZE[1])
-        y = random.randrange(0, sh[0] - CROP_SIZE[0])
+            x = random.randrange(0, sh[1] - CROP_SIZE[1])
+            y = random.randrange(0, sh[0] - CROP_SIZE[0])
 
-        xEnd = x + CROP_SIZE[1]
-        yEnd = y + CROP_SIZE[0]
+            xEnd = x + CROP_SIZE[1]
+            yEnd = y + CROP_SIZE[0]
         
-        #print "Y: %d:%d, X: %d:%d" %(x, xEnd, y, yEnd)
+            #print "Y: %d:%d, X: %d:%d" %(x, xEnd, y, yEnd)
 
-        cr = img[y:yEnd, x:xEnd, :3]
+            cr = img[y:yEnd, x:xEnd, :3]
 
-        #print cr.shape
+            #print cr.shape
 
-        imgLoc = out + "crop_%d.png" % (i)
-        #io.imshow(cr)
-        #io.show()
-        io.imsave(imgLoc, cr)
+            imgLoc = out + "crop_%d.png" % (i)
+            #io.imshow(cr)
+            #io.show()
+            io.imsave(imgLoc, cr)
 
-        crops.append(imgLoc)
+            crops.append(imgLoc)
           
     return crops
 

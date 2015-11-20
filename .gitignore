@@ -2,3 +2,4 @@
 *.png
 *.pyc
 *~
+data/images/training_manifest.txt
