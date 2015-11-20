@@ -1,9 +1,11 @@
 
 import os
 import sys
-import argparse
-import random
 import glob
+import random
+import shutil
+import argparse
+import numpy as np
 
 from skimage import io, transform
 
@@ -14,12 +16,14 @@ MAX_OCCLUSION_BB_AREA = 1
 IMAGE_SCALES = [0.5, 0.75, 1, 1.25, 1.5, 2]
 CROP_SIZE = (170, 85)
 
+QUIET = False
+
 #Read in file of filenames
 def loadFileNames(txt_file, root="."):
     names = []
     with open(txt_file, 'r') as f:
         for line in f:
-            names.append(root + "/" + line.strip())
+            names.append(os.path.join(root, line.strip()))
 
     return names
 
@@ -57,11 +61,15 @@ def createSprites(num_sprites, root, in_file, out_folder):
     return augmented
 
 
-def getImages(num_imgs, root, in_file, out_file, no_cache, create, name="images"):
-    images = glob.glob(out_file+"/*.png")
+def getImages(num_imgs, root, in_file, out_dir, no_cache, create, name="images"):
+    try:
+        os.makedirs(out_dir)
+    except:
+        pass
+    images = glob.glob(out_dir+"/*.png")
 
     if no_cache or len(images) < num_imgs:
-        images = create(num_imgs, root, in_file, out_file)       
+        images = create(num_imgs, root, in_file, out_dir)       
     else:
         print "Sampling %d %s out of %d cached." % (num_imgs, name ,len(images))
         images = random.sample(images, num_imgs)
@@ -80,11 +88,12 @@ def createCrops(num_crops, root, in_file, out_folder):
             resized_im = transform.rescale(original_im, scale)
             images.append(resized_im)
 
-    print "Generating %d crops:" % (num_crops)
+    if not QUIET:
+        print "Generating %d crops:" % (num_crops)
 
     out = out_folder + "/"
     for i in xrange(num_crops):
-        if i % 100 == 0:
+        if i % 100 == 0 and not QUIET:
             print "Processed: %d" % (i)
         img = random.choice(images)
         sh = img.shape
@@ -97,7 +106,7 @@ def createCrops(num_crops, root, in_file, out_folder):
         
         #print "Y: %d:%d, X: %d:%d" %(x, xEnd, y, yEnd)
 
-        cr = img[y:yEnd, x:xEnd]
+        cr = img[y:yEnd, x:xEnd, :3]
 
         #print cr.shape
 
@@ -111,9 +120,80 @@ def createCrops(num_crops, root, in_file, out_folder):
     return crops
 
 
+def insert(sprite_im, crop_im, x, y, xEnd, yEnd):
+    subcrop = crop_im[y:yEnd, x:xEnd, :]
+    assert subcrop.shape[:2] == sprite_im.shape[:2]
+    assert subcrop.shape[2] == 3
+    assert sprite_im.shape[2] == 4
+    mask = np.expand_dims(sprite_im[:,:,3] > 1, axis=2)
+
+
+    subcrop = mask * sprite_im[:,:,:3] + (1 - mask) * subcrop
+    crop_im[y:yEnd, x:xEnd, :] = subcrop[:,:,:]
+    return crop_im
+
+
+def make_instances(sprite_files, crop_files, root, out_dir, percent_positive):
+    positive_dir = os.path.join(out_dir, "waldos")
+    negative_dir = os.path.join(out_dir, "background")
+    try:
+        os.makedirs(positive_dir)
+    except:
+        pass
+    try:
+        os.makedirs(negative_dir)
+    except:
+        pass
+    if not QUIET:
+        print "Creating Dataset in %s" % out_dir
+
+    sprites = map(lambda fn: io.imread(fn), sprite_files)
+
+    positive_files = []
+    negative_files = []
+    for crop_fn in crop_files:
+        is_positive = random.random() < percent_positive
+
+        if is_positive:
+            crop_im = io.imread(crop_fn)
+
+            sprite_im = random.choice(sprites)
+            sprite_sh = sprite_im.shape
+
+            x = random.randrange(0, CROP_SIZE[1] - sprite_sh[1])
+            y = random.randrange(0, CROP_SIZE[0] - sprite_sh[0])
+
+            xEnd = x + sprite_sh[1]
+            yEnd = y + sprite_sh[0]
+
+            # insert sprite into crop
+            inserted = insert(sprite_im, crop_im, x, y, xEnd, yEnd)
+
+            imgLoc = os.path.join(positive_dir, "waldo_%d.png" % len(positive_files))
+            io.imsave(imgLoc, inserted)
+            positive_files.append(imgLoc)
+        else:
+            imgLoc = os.path.join(negative_dir, "background_%d.png" % len(positive_files))
+            shutil.copyfile(crop_fn, imgLoc)
+            negative_files.append(imgLoc)
+
+
+    return positive_files, negative_files
+
+def create_manifest(filename, positives, negatives):
+    if not QUIET:
+        print "Writing manifest to %s" % filename
+    with open(filename, 'w') as out:
+        for fn in positives:
+            out.write("%s %d\n" % (fn, 1))
+        for fn in negatives:
+            out.write("%s %d\n" % (fn, 0))
+    
 def main(args):
     sprites = getImages(args.num_sprites, args.root, args.sprite_in_file, args.sprite_out_dir, args.sprite_no_cache, createSprites, "sprites")
     crops = getImages(args.num_crops, args.root, args.data_manifest, args.crop_out_dir, args.crops_no_cache, createCrops, "crops")
+    positives, negatives = make_instances(sprites, crops, args.root, args.training_out_dir, args.percent_positive)
+    create_manifest(args.training_manifest, positives, negatives)
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Creates a dataset")
@@ -144,10 +224,14 @@ def parse_args():
     parser.add_argument("-m", "--training-manifest", default="data/images/training_manifest.txt",
                 help="Output Manifest File listing training images and labels")
 
+    parser.add_argument("-q", "--quiet", default=False, action="store_true",
+                help="Supress Printing")
+
     return parser.parse_args()
     
 
 if __name__ == "__main__":
     args = parse_args()
+    QUIET = args.quiet
     main(args)
 
