@@ -72,6 +72,13 @@ def createCrops(num_crops, root, in_file, out_folder):
     filenames = loadFileNames(in_file, root)
     
     crops = []
+	images = []
+
+	for fn in filenames:
+		original_im = io.imread(fn)
+		for scale in IMAGE_SCALES:
+			resized_im = transform.rescale(original_im, scale)
+			images.append(resized_im)
 
     print "Generating %d crops:" % (num_crops)
 
@@ -79,11 +86,7 @@ def createCrops(num_crops, root, in_file, out_folder):
     for i in xrange(num_crops):
         if i % 100 == 0:
             print "Processed: %d" % (i)
-        fn = random.choice(filenames)
-        img = io.imread(fn)
-
-        scale = random.choice(IMAGE_SCALES)
-        img = transform.rescale(img, scale)
+        img = random.choice(images)
         sh = img.shape
 
         x = random.randrange(0, sh[1] - CROP_SIZE[1])
