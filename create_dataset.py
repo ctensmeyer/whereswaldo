@@ -3,8 +3,9 @@ import os
 import sys
 import argparse
 import random
+import glob
 
-from skimage import io
+from skimage import io, transform
 
 SPRITE_OCCLUSION_HEIGHT = 0.75
 MIN_OCCLUSION_BB_AREA = 0.1
@@ -25,9 +26,14 @@ def loadFileNames(txt_file, root="."):
 def randomBeta(low, high, beta,alpha):
     return (random.betavariate(alpha,beta)* (high-low)) + low
 
+
 def createSprites(num_sprites, root, in_file, out_folder):
     filenames = loadFileNames(in_file, root)
     
+    augmented = []
+
+    print "Generating %d sprites:" % (num_sprites)
+
     out = out_folder + "/"
     for i in xrange(num_sprites):
         fn = random.choice(filenames)
@@ -35,7 +41,7 @@ def createSprites(num_sprites, root, in_file, out_folder):
         sh = sprite.shape
 
         #Drop alpha box on spite. 
-        startY = randomBeta(sh[0]/4.0, sh[0], 5,1)
+        startY = randomBeta(sh[0]*SPRITE_OCCLUSION_HEIGHT, sh[0], 5,1)
         startX = randomBeta(0, sh[1], 5,1) #More likely to start square on left side of image.
 
         endY = randomBeta(startY, sh[0], 0.5,5)
@@ -43,17 +49,68 @@ def createSprites(num_sprites, root, in_file, out_folder):
 
         sprite[startY:endY, startX:endX, 3] = 0
         
-        io.imsave(out + "spite_%d.png" % (i), sprite)
+        imgLoc = out + "sprite_%d.png" % (i)
 
+        io.imsave(imgLoc, sprite)
+        augmented.append(imgLoc)
           
- 
-def getSprites(num_sprites, root, in_file, out_file, no_cache):
-    createSprites(num_sprites, root, in_file, out_file)       
+    return augmented
+
+
+def getImages(num_imgs, root, in_file, out_file, no_cache, create, name="images"):
+    images = glob.glob(out_file+"/*.png")
+
+    if no_cache or len(images) < num_imgs:
+        images = create(num_imgs, root, in_file, out_file)       
+    else:
+        print "Sampling %d %s out of %d cached." % (num_imgs, name ,len(images))
+        images = random.sample(images, num_imgs)
+
+    return images
+
+def createCrops(num_crops, root, in_file, out_folder):
+    filenames = loadFileNames(in_file, root)
     
+    crops = []
+
+    print "Generating %d crops:" % (num_crops)
+
+    out = out_folder + "/"
+    for i in xrange(num_crops):
+        if i % 100 == 0:
+            print "Processed: %d" % (i)
+        fn = random.choice(filenames)
+        img = io.imread(fn)
+
+        scale = random.choice(IMAGE_SCALES)
+        img = transform.rescale(img, scale)
+        sh = img.shape
+
+        x = random.randrange(0, sh[1] - CROP_SIZE[1])
+        y = random.randrange(0, sh[0] - CROP_SIZE[0])
+
+        xEnd = x + CROP_SIZE[1]
+        yEnd = y + CROP_SIZE[0]
+        
+        #print "Y: %d:%d, X: %d:%d" %(x, xEnd, y, yEnd)
+
+        cr = img[y:yEnd, x:xEnd]
+
+        #print cr.shape
+
+        imgLoc = out + "crop_%d.png" % (i)
+        #io.imshow(cr)
+        #io.show()
+        io.imsave(imgLoc, cr)
+
+        crops.append(imgLoc)
+          
+    return crops
+
 
 def main(args):
-    sprites = getSprites(args.num_sprites, args.root, args.sprite_in_file, args.sprite_out_dir, args.sprite_no_cache)
-
+    sprites = getImages(args.num_sprites, args.root, args.sprite_in_file, args.sprite_out_dir, args.sprite_no_cache, createSprites, "sprites")
+    crops = getImages(args.num_crops, args.root, args.data_manifest, args.crop_out_dir, args.crops_no_cache, createCrops, "crops")
 
 def parse_args():
 	parser = argparse.ArgumentParser(description="Creates a dataset")
