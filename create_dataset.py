@@ -8,14 +8,21 @@ import argparse
 import numpy as np
 import warnings
 
-from skimage import io, transform, filters
+from skimage import io, transform, filters, color
+import matplotlib.pyplot as pl
 
 SPRITE_OCCLUSION_HEIGHT = 0.75
+SPRITE_ROTATE = (-0.5235987755982988, 0.5235987755982988) # +- 30 in radians
+SPRITE_SCALE = (0.75, 1.25)
+SPRITE_SHEAR = (-0.3490658503988659, 0.3490658503988659) #+- 20 in radians
+
 MIN_OCCLUSION_BB_AREA = 0.1
 MAX_OCCLUSION_BB_AREA = 1
 
 IMAGE_SCALES = [0.5, 0.75, 1, 1.25, 1.5, 2]
 CROP_SIZE = (170, 170)
+
+HSV_SATURATION_SIGMA_RANGE = (0.3,1.4)
 
 QUIET = False
 
@@ -31,6 +38,12 @@ def loadFileNames(txt_file, root="."):
 def randomBeta(low, high, beta,alpha):
     return (random.betavariate(alpha,beta)* (high-low)) + low
 
+def otsu_alpha(im):
+    threshold = filters.threshold_otsu(im[:,:,3])
+    im[im[:,:,3] < threshold, 3] = 0
+    im[im[:,:,3] >= threshold, 3] = 255
+
+    return im
 
 def createSprites(num_sprites, root, in_file, out_folder):
     filenames = loadFileNames(in_file, root)
@@ -46,9 +59,7 @@ def createSprites(num_sprites, root, in_file, out_folder):
         sh = sprite.shape
 
         #Fix alpha channel
-        threshold = filters.threshold_otsu(sprite[:,:,3])
-        sprite[sprite[:,:,3] < threshold] = 0
-        sprite[sprite[:,:,3] >= threshold, 3] = 255
+        sprite = otsu_alph(sprite)
 
         #Drop alpha box on spite. 
         startY = randomBeta(sh[0]*SPRITE_OCCLUSION_HEIGHT, sh[0], 5,1)
@@ -167,19 +178,45 @@ def make_instances(sprite_files, crop_files, root, out_dir, percent_positive):
             crop_im = io.imread(crop_fn)
 
             sprite_im = random.choice(sprites)
-            sprite_sh = sprite_im.shape
 
+            #print sprite_im.shape
+
+            #Randomly tranform sprite_im
+            scale = (random.uniform(*SPRITE_SCALE), random.uniform(*SPRITE_SCALE))
+            rotation = random.uniform(*SPRITE_ROTATE)
+            shear = random.uniform(*SPRITE_SHEAR)
+
+            trans = transform.AffineTransform(scale=scale, rotation=rotation, shear=shear)
+            sprite_im = otsu_alpha(transform.warp(sprite_im, trans, mode="constant", cval=0, preserve_range=True))
+
+            sprite_sh = sprite_im.shape
+            #io.imshow(sprite_im[:,:,3])
+            #io.show()
+            #print sprite_im.shape, crop_im.shape
+            #print
+
+    
             x = random.randrange(0, CROP_SIZE[1] - sprite_sh[1])
             y = random.randrange(0, CROP_SIZE[0] - sprite_sh[0])
 
             xEnd = x + sprite_sh[1]
             yEnd = y + sprite_sh[0]
 
+            #print "Y: %d:%d X: %d:%d" % (y,yEnd, x,xEnd)
+
             # insert sprite into crop
             inserted = insert(sprite_im, crop_im, x, y, xEnd, yEnd)
+            #io.imshow(inserted)
+            #io.show()
+
+            hsv = color.rgb2hsv(inserted)
+            sigma = random.uniform(*HSV_SATURATION_SIGMA_RANGE)
+            hsv[:,:,1] = filters.gaussian_filter(hsv[:,:,1], sigma)
+
+            img = color.hsv2rgb(hsv) #Unsure how to save HSV image
 
             imgLoc = os.path.join(positive_dir, "waldo_%d.png" % len(positive_files))
-            io.imsave(imgLoc, inserted)
+            io.imsave(imgLoc, img)
             positive_files.append(imgLoc)
         else:
             imgLoc = os.path.join(negative_dir, "background_%d.png" % len(positive_files))
@@ -199,7 +236,7 @@ def create_manifest(filename, positives, negatives):
             out.write("%s %d\n" % (fn, 0))
     
 def main(args):
-    sprites = getImages(args.num_sprites, args.root, args.sprite_in_file, args.sprite_out_dir, args.sprite_no_cache, createSprites, "sprites")
+    sprites = getImages(args.num_sprites, args.root, args.sprite_in_file, args.sprite_out_dir, args.sprites_no_cache, createSprites, "sprites")
     crops = getImages(args.num_crops, args.root, args.data_manifest, args.crop_out_dir, args.crops_no_cache, createCrops, "crops")
     positives, negatives = make_instances(sprites, crops, args.root, args.training_out_dir, args.percent_positive)
     create_manifest(args.training_manifest, positives, negatives)
