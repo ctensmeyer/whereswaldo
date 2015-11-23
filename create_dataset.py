@@ -215,14 +215,14 @@ def parse_args():
     parser.add_argument("--sprite-no-cache", default=False, action="store_true",
                 help="By default use any precomputed augmented sprites")
     parser.add_argument("-s", "--num-sprites", default=20, type=int, 
-                help="Number of random occlusions applied to each sprite")
+                help="Number of generated sprite images")
 
     parser.add_argument("-d", "--data-manifest", default='data/training_images.txt', 
                 help="File containing paths to each training image")
     parser.add_argument("--crop-out-dir", default="data/images/random_crops",
                 help="Output directory where the random crops are put")
     parser.add_argument("-n", "--num-crops", default=10000, type=int, 
-                help="Number of random crops taken from each training image")
+                help="Number of total random crops")
     parser.add_argument("--crops-no-cache", default=False, action="store_true",
                 help="By default use previously computed random crops")
 
