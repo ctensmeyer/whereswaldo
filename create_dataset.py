@@ -15,7 +15,7 @@ MIN_OCCLUSION_BB_AREA = 0.1
 MAX_OCCLUSION_BB_AREA = 1
 
 IMAGE_SCALES = [0.5, 0.75, 1, 1.25, 1.5, 2]
-CROP_SIZE = (170, 85)
+CROP_SIZE = (170, 170)
 
 QUIET = False
 
@@ -212,7 +212,7 @@ def parse_args():
                 help="File containing paths to each sprite")
     parser.add_argument("--sprite-out-dir", default="data/images/augmented_sprites",
                 help="Output directory where the augmented sprites will be written")
-    parser.add_argument("--sprite-no-cache", default=False, action="store_true",
+    parser.add_argument("--sprites-no-cache", default=False, action="store_true",
                 help="By default use any precomputed augmented sprites")
     parser.add_argument("-s", "--num-sprites", default=20, type=int, 
                 help="Number of generated sprite images")
