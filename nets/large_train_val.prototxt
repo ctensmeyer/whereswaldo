@@ -9,11 +9,11 @@ layer {
   }
   transform_param {
     mirror: true
-    crop_size: 150x75
+    crop_size: 150
     mean_file: "data/waldo_mean.binaryproto"
   }
   data_param {
-    source: "data/waldo_train_lmdd"
+    source: "data/lmdb/waldo_train_lmdd"
     batch_size: 256
     backend: LMDB
   }
@@ -29,11 +29,11 @@ layer {
   }
   transform_param {
     mirror: false
-    crop_size: 150x75
+    crop_size: 150
     mean_file: "data/waldo_mean.binaryproto"
   }
   data_param {
-    source: "data/waldo_val_lmdb"
+    source: "data/lmdb/waldo_val_lmdb"
     batch_size: 50
     backend: LMDB
   }
