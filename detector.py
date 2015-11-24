@@ -88,6 +88,7 @@ def handle_image(fn, caffenet, args):
 	detect_width = caffenet.blobs[args.input].data.shape[3]
 
 	heatmaps = list()
+	best_detection = (0, 0, 0, 0)
 	for scale in IMG_SCALES:
 		im = im_original.resize( (int(im_original.size[0] * float(scale)), int(im_original.size[1] * float(scale))), 
 			resample=Image.BILINEAR)
@@ -102,13 +103,22 @@ def handle_image(fn, caffenet, args):
 		bb_out = get_output_name(fn, args.out_dir, "bb_%.2f" % scale)
 		
 		y, x = np.unravel_index(heatmap.argmax(), heatmap.shape)
-		print scale, x, y
 		x = x * args.stride
 		y = y * args.stride
+		score = heatmap.max()
+		print scale, x, y, score 
+		if score > best_detection[0]:
+			best_detection = (score, x, y, scale)
 
 		draw = ImageDraw.Draw(im)
 		draw_bb(draw, x, y, detect_width, detect_height)
 		im.save(bb_out)
+
+	bb_out = get_output_name(fn, args.out_dir, "bb_best_%.2f" % best_detection[3])
+
+	draw = ImageDraw.Draw(im_original)
+	draw_bb(draw, best_detection[1], best_detection[2], detect_width, detect_height)
+	im_original.save(bb_out)
 
 
 def main(args):
