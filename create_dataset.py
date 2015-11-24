@@ -45,7 +45,7 @@ def close_dbs():
     for env, txn, next_key in LMDBS.values():
         try:
             if not QUIET:
-                print "Closing %s as LMDB" % env.path()
+                print "Closing %s" % env.path()
             txn.commit()
             env.sync()
             env.close()
@@ -303,15 +303,16 @@ def make_instances(sprite_files, crop_files, root, out_dir, percent_positive, nu
 
             
             if use_hsv:
-		img = hsv
-	    else:
+                img = hsv
+            else:
                 img = color.hsv2rgb(hsv) #Unsure how to save HSV image
 
             imgLoc = os.path.join(positive_dir, "waldo_%d.png" % len(positive_files))
             io.imsave(imgLoc, img)
             positive_files.append(imgLoc)
 
-            append_db(img, 1, method, np.asarray([x, y, xEnd, yEnd], dtype=np.float))
+            bb = [float(x) / CROP_SIZE[0], float(y) / CROP_SIZE[1], float(xEnd) / CROP_SIZE[0], float(yEnd) / CROP_SIZE[0]]
+            append_db(img, 1, method, np.asarray(bb, dtype=np.float))
         else:
             imgLoc = os.path.join(negative_dir, "background_%d.png" % len(negative_files))
             shutil.copyfile(crop_fn, imgLoc)
@@ -325,7 +326,7 @@ def make_instances(sprite_files, crop_files, root, out_dir, percent_positive, nu
             hsv[:,:,1] = filters.gaussian_filter(hsv[:,:,1],sigma)
 
             if use_hsv:
-		img = hsv
+                img = hsv
             else:
                 img = color.hsv2rgb(hsv)
 
@@ -388,7 +389,7 @@ def parse_args():
     parser.add_argument("-l", "--lmdb-prefix", default="data/lmdb/waldo",
                 help="Prefix for the lmdbs")
     parser.add_argument("--hsv", action="store_true",
-		help="Specify whether to store HSV images in the LMDB")
+        help="Specify whether to store HSV images in the LMDB")
     
     parser.add_argument("-q", "--quiet", default=False, action="store_true",
                 help="Supress Printing")
