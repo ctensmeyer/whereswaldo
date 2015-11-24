@@ -66,7 +66,11 @@ def get_output_name(f, out_dir, tag):
 	ext = base[-4:]
 	base = base[:-4]
 
-	return os.path.join(out_dir, "%s_%s%s" % (base, tag, ext))
+	sdir = os.path.join(out_dir, base)
+	if not os.path.exists(sdir):
+		os.mkdir(sdir)
+
+	return os.path.join(sdir, "%s%s" % (tag, ext))
 
 
 def draw_bb(draw, x, y, width, height, color='blue', thick=5):
