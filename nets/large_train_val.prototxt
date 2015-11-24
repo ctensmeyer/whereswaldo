@@ -13,8 +13,8 @@ layer {
     mean_file: "data/waldo_mean.binaryproto"
   }
   data_param {
-    source: "data/lmdb/waldo_train_lmdd"
-    batch_size: 256
+    source: "data/lmdb/waldo_train_lmdb"
+    batch_size: 128
     backend: LMDB
   }
 }
@@ -52,9 +52,10 @@ layer {
     decay_mult: 0
   }
   convolution_param {
-    num_output: 96
-    kernel_size: 11
-    stride: 4
+    num_output: 64
+    kernel_size: 9
+    stride: 3
+	pad: 4
     weight_filler {
       type: "gaussian"
       std: 0.01
@@ -107,10 +108,9 @@ layer {
     decay_mult: 0
   }
   convolution_param {
-    num_output: 256
+    num_output: 96
     pad: 2
     kernel_size: 5
-    group: 2
     weight_filler {
       type: "gaussian"
       std: 0.01
@@ -163,7 +163,7 @@ layer {
     decay_mult: 0
   }
   convolution_param {
-    num_output: 384
+    num_output: 192
     pad: 1
     kernel_size: 3
     weight_filler {
@@ -196,10 +196,9 @@ layer {
     decay_mult: 0
   }
   convolution_param {
-    num_output: 384
+    num_output: 192
     pad: 1
     kernel_size: 3
-    group: 2
     weight_filler {
       type: "gaussian"
       std: 0.01
@@ -230,10 +229,9 @@ layer {
     decay_mult: 0
   }
   convolution_param {
-    num_output: 256
+    num_output: 96
     pad: 1
     kernel_size: 3
-    group: 2
     weight_filler {
       type: "gaussian"
       std: 0.01
@@ -275,7 +273,7 @@ layer {
     decay_mult: 0
   }
   inner_product_param {
-    num_output: 4096
+    num_output: 1024
     weight_filler {
       type: "gaussian"
       std: 0.005
@@ -315,7 +313,7 @@ layer {
     decay_mult: 0
   }
   inner_product_param {
-    num_output: 4096
+    num_output: 1024
     weight_filler {
       type: "gaussian"
       std: 0.005
