@@ -23,6 +23,7 @@ IMAGE_SCALES = [0.5, 0.75, 1, 1.25, 1.5, 2]
 CROP_SIZE = (170, 170)
 
 HSV_SATURATION_SIGMA_RANGE = (0.1,1.4)
+NOISE_RANGE = 10
 
 QUIET = False
 
@@ -226,7 +227,14 @@ def insert(sprite_im, crop_im, x, y, xEnd, yEnd):
     return crop_im
 
 
-def make_instances(sprite_files, crop_files, root, out_dir, percent_positive, num_validation):
+def addNoise(img, std):
+    idx = np.random.random_integers(0,1, size = img.shape) # Create a binary index matrix for which pixels to adjust
+
+    noise = (np.random.standard_normal(img.shape) - 1.0) * std # readjust standard normal to have a mean of 0 with a std of std
+
+    img[idx] += noise
+
+def make_instances(sprite_files, crop_files, root, out_dir, percent_positive, num_validation, use_hsv):
     positive_dir = os.path.join(out_dir, "waldos")
     negative_dir = os.path.join(out_dir, "background")
     try:
@@ -287,7 +295,14 @@ def make_instances(sprite_files, crop_files, root, out_dir, percent_positive, nu
             sigma = random.uniform(*HSV_SATURATION_SIGMA_RANGE)
             hsv[:,:,1] = filters.gaussian_filter(hsv[:,:,1], sigma)
 
-            img = color.hsv2rgb(hsv) #Unsure how to save HSV image
+	    if use_hsv:
+		img = hsv
+	    else:
+                img = color.hsv2rgb(hsv) #Unsure how to save HSV image
+
+	    addNoise(img, 10)
+	    pl.imshow(img)
+            pl.show()
 
             imgLoc = os.path.join(positive_dir, "waldo_%d.png" % len(positive_files))
             io.imsave(imgLoc, img)
@@ -300,6 +315,9 @@ def make_instances(sprite_files, crop_files, root, out_dir, percent_positive, nu
             negative_files.append(imgLoc)
 
             img = io.imread(crop_fn)
+            if use_hsv:
+		img = color.rgb2hsv(img)
+
             append_db(img, 0, method, np.asarray([0, 0, 0, 0], dtype=np.float))
 
 
@@ -319,7 +337,7 @@ def main(args):
 
     sprites = getImages(args.num_sprites, args.root, args.sprite_in_file, args.sprite_out_dir, args.sprites_no_cache, createSprites, "sprites")
     crops = getImages(args.num_crops, args.root, args.data_manifest, args.crop_out_dir, args.crops_no_cache, createCrops, "crops")
-    positives, negatives = make_instances(sprites, crops, args.root, args.training_out_dir, args.percent_positive, args.num_validation)
+    positives, negatives = make_instances(sprites, crops, args.root, args.training_out_dir, args.percent_positive, args.num_validation, args.hsv)
 
     # not strictly needed anymore
     create_manifest(args.training_manifest, positives, negatives)
@@ -358,7 +376,9 @@ def parse_args():
                 help="Output Manifest File listing training images and labels")
     parser.add_argument("-l", "--lmdb-prefix", default="data/lmdb/waldo",
                 help="Prefix for the lmdbs")
-
+    parser.add_argument("--hsv", aciton="store_true",
+		help="Specify whether to store HSV images in the LMDB")
+    
     parser.add_argument("-q", "--quiet", default=False, action="store_true",
                 help="Supress Printing")
 
