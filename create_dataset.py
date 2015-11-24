@@ -42,11 +42,19 @@ def init_dbs(args):
 
 def close_dbs():
     for env, txn, next_key in LMDBS.values():
-        txn.commit()
-        env.sync()
-        env.close()
+        try:
+            if not QUIET:
+                print "Closing %s as LMDB" % env.path()
+            txn.commit()
+            env.sync()
+            env.close()
+        except Exception as e:
+            print "Error occurred in closing %s" % env.path()
+            print e
 
 def open_db(db_file):
+    if not QUIET:
+        print "Opening %s as LMDB" % db_file
     env = lmdb.open(db_file, readonly=False, map_size=int(2 ** 42), writemap=True)
     txn = env.begin(write=True)
     return env, txn, 0
