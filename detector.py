@@ -83,7 +83,9 @@ def save_heatmap(heatmap, size, heat_out):
 	#heatmap = cv2.resize(heatmap, (im_np.shape[1], im_np.shape[0]), interpolation=cv2.INTER_NEAREST)
 	heatmap = cv2.resize(heatmap, size, interpolation=cv2.INTER_NEAREST)
 	print heatmap.shape
-	cv2.imwrite(heat_out, heatmap)
+	expanded = np.zeros( (heatmap.shape[0], heatmap.shape[1], 3), dtype=np.uint8)
+	expanded[:,:,2] = heatmap
+	cv2.imwrite(heat_out, expanded)
 	
 
 def handle_image(fn, caffenet, args):
