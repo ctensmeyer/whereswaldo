@@ -82,6 +82,7 @@ def save_heatmap(heatmap, size, heat_out):
 	heatmap = (heatmap / heatmap.max() * 255).astype(dtype=np.uint8)
 	#heatmap = cv2.resize(heatmap, (im_np.shape[1], im_np.shape[0]), interpolation=cv2.INTER_NEAREST)
 	heatmap = cv2.resize(heatmap, size, interpolation=cv2.INTER_NEAREST)
+	print heatmap.shape
 	cv2.imwrite(heat_out, heatmap)
 	
 
@@ -114,14 +115,17 @@ def handle_image(fn, caffenet, args):
 		if score > best_detection[0]:
 			best_detection = (score, x, y, scale)
 
-		draw = ImageDraw.Draw(im)
-		draw_bb(draw, x, y, detect_width, detect_height)
-		im.save(bb_out)
+		bb_im = im_original.copy()
+
+		draw = ImageDraw.Draw(bb_im)
+		draw_bb(draw, int(x / scale), int(y / scale), int(detect_width / scale), int(detect_height / scale) )
+		bb_im.save(bb_out)
 
 	bb_out = get_output_name(fn, args.out_dir, "bb_best_%.2f" % best_detection[3])
 
 	draw = ImageDraw.Draw(im_original)
-	draw_bb(draw, best_detection[1], best_detection[2], detect_width, detect_height)
+	score, x, y, scale = best_detection
+	draw_bb(draw, int(x / scale), int(y / scale), int(detect_width / scale), int(detect_height / scale) )
 	im_original.save(bb_out)
 
 
