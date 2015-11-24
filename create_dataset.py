@@ -2,30 +2,90 @@
 import os
 import sys
 import glob
+import lmdb
 import random
 import shutil
 import argparse
-import numpy as np
 import warnings
+import numpy as np
 
-from skimage import io, transform, filters, color
+import caffe.proto.caffe_pb2
 import matplotlib.pyplot as pl
+from skimage import io, transform, filters, color
 
 SPRITE_OCCLUSION_HEIGHT = 0.75
 SPRITE_ROTATE = (-0.5235987755982988, 0.5235987755982988) # +- 30 in radians
 SPRITE_SCALE = (0.75, 1.25)
 SPRITE_SHEAR = (-0.3490658503988659, 0.3490658503988659) #+- 20 in radians
 
-MIN_OCCLUSION_BB_AREA = 0.1
-MAX_OCCLUSION_BB_AREA = 1
-
 IMAGE_SCALES = [0.5, 0.75, 1, 1.25, 1.5, 2]
 CROP_SIZE = (170, 170)
 
-HSV_SATURATION_SIGMA_RANGE = (0.3,1.4)
+HSV_SATURATION_SIGMA_RANGE = (0.1,1.4)
 
 QUIET = False
 
+LMDBS = dict()
+
+def init_dbs(args):
+    for method in ["train", "val"]:
+        for data in ["images", "bbs"]:
+            fn = "%s_%s_%s_lmdb" % (args.lmdb_prefix, method, data)
+            if os.path.exists(fn):
+                try:
+                    shutil.rmtree(fn)
+                except:
+                    pass
+            LMDBS["%s_%s" % (method, data)] = open_db(fn)
+
+
+def close_dbs():
+    for env, txn in LMDBS.values():
+        txn.commit()
+        env.sync()
+        env.close()
+
+def open_db(db_file):
+    env = lmdb.open(db_file, readonly=False, map_size=int(2 ** 42), writemap=True)
+    txn = env.begin(write=True)
+    return env, txn, 0
+
+def get_handles(method, data):
+    env, txn, next_key = LMDBS["%s_%s" % (method, data)]
+    LMDBS["%s_%s" % (method, data)] = (env, txn, next_key + 1)
+    return env, txn, next_key
+    
+
+def append_db(im, label, method, bb=None):
+    env_im, txn_im, next_key_im = get_handles(method, "images")
+
+    datum = caffe.proto.caffe_pb2.Datum()
+
+    datum.label = label
+    datum.channels = im.shape[2]
+    datum.height = im.shape[0]
+    datum.width = im.shape[1]
+    if (im.dtype == np.float):
+        datum.float_data = datum_im.transpose(2, 0, 1).tostring()
+    else:
+        datum.data = datum_im.transpose(2, 0, 1).tostring()
+
+    txn_im.put(next_key_im, datum.SerializeToString())
+
+    if bb is not None:
+        env_bb, txn_bb, next_key_bb = get_handles(method, "bbs")
+        assert next_key_bb == next_key_im
+
+        datum = caffe.proto.caffe_pb2.Datum()
+        datum.channels = 4
+        datum.height = 1
+        datum.width = 1 
+        datum.float_data = bb.tostring()
+
+        txn_bb.put(next_key_bb, datum.SerializeToString())
+        
+
+    
 #Read in file of filenames
 def loadFileNames(txt_file, root="."):
     names = []
@@ -44,6 +104,7 @@ def otsu_alpha(im):
     im[im[:,:,3] >= threshold, 3] = 255
 
     return im
+
 
 def createSprites(num_sprites, root, in_file, out_folder):
     filenames = loadFileNames(in_file, root)
@@ -236,10 +297,16 @@ def create_manifest(filename, positives, negatives):
             out.write("%s %d\n" % (fn, 0))
     
 def main(args):
+    init_dbs(args)
+
     sprites = getImages(args.num_sprites, args.root, args.sprite_in_file, args.sprite_out_dir, args.sprites_no_cache, createSprites, "sprites")
     crops = getImages(args.num_crops, args.root, args.data_manifest, args.crop_out_dir, args.crops_no_cache, createCrops, "crops")
     positives, negatives = make_instances(sprites, crops, args.root, args.training_out_dir, args.percent_positive)
+
+    # not strictly needed anymore
     create_manifest(args.training_manifest, positives, negatives)
+
+    close_dbs()
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Creates a dataset")
@@ -265,10 +332,14 @@ def parse_args():
 
     parser.add_argument("-p", "--percent-positive", default=0.5, type=float, 
                 help="Percentage of random crops that will be positive examples")
+    parser.add_argument("-v", "--percent-validation", default=0.1, type=float, 
+                help="Percentage of random crops that will be used in validation set")
     parser.add_argument("-o", "--training-out-dir", default="data/images/training_data",
                 help="Output directory where the random crops are put")
     parser.add_argument("-m", "--training-manifest", default="data/images/training_manifest.txt",
                 help="Output Manifest File listing training images and labels")
+    parser.add_argument("-l", "--lmdb-prefix", default="data/lmdb/waldo",
+                help="Prefix for the lmdbs")
 
     parser.add_argument("-q", "--quiet", default=False, action="store_true",
                 help="Supress Printing")
