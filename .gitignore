@@ -3,3 +3,8 @@
 *.pyc
 *~
 data/images/training_manifest.txt
+data/lmdb
+logs
+test
+*.binaryproto
+*.npy
