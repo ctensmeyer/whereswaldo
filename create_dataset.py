@@ -7,6 +7,7 @@ import random
 import shutil
 import argparse
 import warnings
+import StringIO
 import numpy as np
 
 import caffe.proto.caffe_pb2
@@ -40,7 +41,7 @@ def init_dbs(args):
 
 
 def close_dbs():
-    for env, txn in LMDBS.values():
+    for env, txn, next_key in LMDBS.values():
         txn.commit()
         env.sync()
         env.close()
@@ -53,7 +54,7 @@ def open_db(db_file):
 def get_handles(method, data):
     env, txn, next_key = LMDBS["%s_%s" % (method, data)]
     LMDBS["%s_%s" % (method, data)] = (env, txn, next_key + 1)
-    return env, txn, next_key
+    return env, txn, str(next_key)
     
 
 def append_db(im, label, method, bb=None):
@@ -66,10 +67,14 @@ def append_db(im, label, method, bb=None):
     datum.height = im.shape[0]
     datum.width = im.shape[1]
     if (im.dtype == np.float):
-        datum.float_data = datum_im.transpose(2, 0, 1).tostring()
+        transposed = im.transpose(2, 0, 1)
+        flattened = transposed.flatten()
+        l = list(flattened)
+        datum.float_data.extend(l)
     else:
-        datum.data = datum_im.transpose(2, 0, 1).tostring()
+        datum.data = im.transpose(2, 0, 1).tostring()
 
+    
     txn_im.put(next_key_im, datum.SerializeToString())
 
     if bb is not None:
@@ -80,10 +85,9 @@ def append_db(im, label, method, bb=None):
         datum.channels = 4
         datum.height = 1
         datum.width = 1 
-        datum.float_data = bb.tostring()
+        datum.float_data.extend(list(bb.flatten()))
 
         txn_bb.put(next_key_bb, datum.SerializeToString())
-        
 
     
 #Read in file of filenames
@@ -120,7 +124,7 @@ def createSprites(num_sprites, root, in_file, out_folder):
         sh = sprite.shape
 
         #Fix alpha channel
-        sprite = otsu_alph(sprite)
+        sprite = otsu_alpha(sprite)
 
         #Drop alpha box on spite. 
         startY = randomBeta(sh[0]*SPRITE_OCCLUSION_HEIGHT, sh[0], 5,1)
@@ -214,7 +218,7 @@ def insert(sprite_im, crop_im, x, y, xEnd, yEnd):
     return crop_im
 
 
-def make_instances(sprite_files, crop_files, root, out_dir, percent_positive):
+def make_instances(sprite_files, crop_files, root, out_dir, percent_positive, num_validation):
     positive_dir = os.path.join(out_dir, "waldos")
     negative_dir = os.path.join(out_dir, "background")
     try:
@@ -232,8 +236,9 @@ def make_instances(sprite_files, crop_files, root, out_dir, percent_positive):
 
     positive_files = []
     negative_files = []
-    for crop_fn in crop_files:
+    for idx, crop_fn in enumerate(crop_files):
         is_positive = random.random() < percent_positive
+        method = "val" if idx < num_validation else "train"
 
         if is_positive:
             crop_im = io.imread(crop_fn)
@@ -279,10 +284,15 @@ def make_instances(sprite_files, crop_files, root, out_dir, percent_positive):
             imgLoc = os.path.join(positive_dir, "waldo_%d.png" % len(positive_files))
             io.imsave(imgLoc, img)
             positive_files.append(imgLoc)
+
+            append_db(img, 1, method, np.asarray([x, y, xEnd, yEnd], dtype=np.float))
         else:
-            imgLoc = os.path.join(negative_dir, "background_%d.png" % len(positive_files))
+            imgLoc = os.path.join(negative_dir, "background_%d.png" % len(negative_files))
             shutil.copyfile(crop_fn, imgLoc)
             negative_files.append(imgLoc)
+
+            img = io.imread(crop_fn)
+            append_db(img, 0, method, np.asarray([0, 0, 0, 0], dtype=np.float))
 
 
     return positive_files, negative_files
@@ -301,7 +311,7 @@ def main(args):
 
     sprites = getImages(args.num_sprites, args.root, args.sprite_in_file, args.sprite_out_dir, args.sprites_no_cache, createSprites, "sprites")
     crops = getImages(args.num_crops, args.root, args.data_manifest, args.crop_out_dir, args.crops_no_cache, createCrops, "crops")
-    positives, negatives = make_instances(sprites, crops, args.root, args.training_out_dir, args.percent_positive)
+    positives, negatives = make_instances(sprites, crops, args.root, args.training_out_dir, args.percent_positive, args.num_validation)
 
     # not strictly needed anymore
     create_manifest(args.training_manifest, positives, negatives)
@@ -332,8 +342,8 @@ def parse_args():
 
     parser.add_argument("-p", "--percent-positive", default=0.5, type=float, 
                 help="Percentage of random crops that will be positive examples")
-    parser.add_argument("-v", "--percent-validation", default=0.1, type=float, 
-                help="Percentage of random crops that will be used in validation set")
+    parser.add_argument("-v", "--num-validation", default=1000, type=int, 
+                help="Number of random crops that will be used in validation set")
     parser.add_argument("-o", "--training-out-dir", default="data/images/training_data",
                 help="Output directory where the random crops are put")
     parser.add_argument("-m", "--training-manifest", default="data/images/training_manifest.txt",
