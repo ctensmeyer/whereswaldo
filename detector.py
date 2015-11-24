@@ -74,11 +74,46 @@ def draw_bb(draw, x, y, width, height, color='blue', thick=5):
 		draw.rectangle( [x-t, y-t, x + width + t, y + height + t], outline=color)
 			
 
+def save_heatmap(heatmap, size, heat_out):
+	heatmap = (heatmap / heatmap.max() * 255).astype(dtype=np.uint8)
+	#heatmap = cv2.resize(heatmap, (im_np.shape[1], im_np.shape[0]), interpolation=cv2.INTER_NEAREST)
+	heatmap = cv2.resize(heatmap, size, interpolation=cv2.INTER_NEAREST)
+	cv2.imwrite(heat_out, heatmap)
+	
+
+def handle_image(fn, caffenet, args):
+	im_original = Image.open(fn)
+	im_original = im_original.convert(mode='RGB')
+	detect_height = caffenet.blobs[args.input].data.shape[2]
+	detect_width = caffenet.blobs[args.input].data.shape[3]
+
+	heatmaps = list()
+	for scale in IMG_SCALES:
+		im = im_original.resize( (int(im_original.size[0] * float(scale)), int(im_original.size[1] * float(scale))), 
+			resample=Image.BILINEAR)
+		im_np = np.array(im.getdata()).reshape(im.size[1], im.size[0], 3)
+
+		heatmap, bbs = detect(im_np, caffenet, args)
+
+		heat_out = get_output_name(fn, args.out_dir, "heatmap_%.2f" % scale)
+		save_heatmap(heatmap, im_original.size, heat_out)
+		heatmaps.append(heatmap)
+
+		bb_out = get_output_name(fn, args.out_dir, "bb_%.2f" % scale)
+		
+		y, x = np.unravel_index(heatmap.argmax(), heatmap.shape)
+		print scale, x, y
+		x = x * args.stride
+		y = y * args.stride
+
+		draw = ImageDraw.Draw(im)
+		draw_bb(draw, x, y, detect_width, detect_height)
+		im.save(bb_out)
+
+
 def main(args):
 	caffenet = init_caffe(args)
 	im_files = get_im_files(args)
-	detect_height = caffenet.blobs[args.input].data.shape[2]
-	detect_width = caffenet.blobs[args.input].data.shape[3]
 
 	try:
 		os.makedirs(args.out_dir)
@@ -87,30 +122,8 @@ def main(args):
 
 	for x, f in enumerate(im_files):
 		try:
-			im = Image.open(f)
-			im = im.convert(mode='RGB')
-
-			im_np = np.array(im.getdata()).reshape(im.size[1], im.size[0], 3)
-
-			heatmap, bbs = detect(im_np, caffenet, args)
-			heat_out = get_output_name(f, args.out_dir, "heatmap")
-			bb_out = get_output_name(f, args.out_dir, "bb")
-			print f, im_np.shape, heatmap.shape
-			
-			y, x = np.unravel_index(heatmap.argmax(), heatmap.shape)
-			print x, y
-			x = x * args.stride
-			y = y * args.stride
-
-			heatmap = (heatmap / heatmap.max() * 255).astype(dtype=np.uint8)
-			heatmap = cv2.resize(heatmap, (im_np.shape[1], im_np.shape[0]), interpolation=cv2.INTER_NEAREST)
-			print heatmap.shape
-			cv2.imwrite(heat_out, heatmap)
-
-			draw = ImageDraw.Draw(im)
-			draw_bb(draw, x, y, detect_width, detect_height)
-			im.save(bb_out)
-
+			print f
+			handle_image(f, caffenet, args)
 
 		except:
 			print "Exception occured processing %s" % f
