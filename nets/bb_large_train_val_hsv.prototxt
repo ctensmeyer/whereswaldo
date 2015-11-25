@@ -10,12 +10,11 @@ layer {
   transform_param {
     mirror: true
     crop_size: 150
-    mean_file: "data/waldo_mean.binaryproto"
-	scale: 255
+    mean_file: "data/waldo_mean_hsv.binaryproto"
+	scale: 100
   }
   data_param {
-    source: "data/lmdb/waldo_train_images_lmdb"
-    #source: "data/lmdb/tmp_train_lmdb"
+    source: "data/lmdb/waldo_hsv_train_images_lmdb"
     batch_size: 64
     backend: LMDB
   }
@@ -28,7 +27,7 @@ layer {
     phase: TRAIN
   }
   data_param {
-    source: "data/lmdb/waldo_train_bbs_lmdb"
+    source: "data/lmdb/waldo_hsv_train_bbs_lmdb"
     batch_size: 64
     backend: LMDB
   }
@@ -45,12 +44,11 @@ layer {
   transform_param {
     mirror: false
     crop_size: 150
-    mean_file: "data/waldo_mean.binaryproto"
-	scale: 255
+    mean_file: "data/waldo_mean_hsv.binaryproto"
+	scale: 100
   }
   data_param {
-    source: "data/lmdb/waldo_val_images_lmdb"
-    #source: "data/lmdb/tmp_val_lmdb"
+    source: "data/lmdb/waldo_hsv_val_images_lmdb"
     batch_size: 50
     backend: LMDB
   }
@@ -63,7 +61,7 @@ layer {
     phase: TEST
   }
   data_param {
-    source: "data/lmdb/waldo_val_bbs_lmdb"
+    source: "data/lmdb/waldo_hsv_val_bbs_lmdb"
     batch_size: 50
     backend: LMDB
   }
