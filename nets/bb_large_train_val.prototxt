@@ -11,9 +11,11 @@ layer {
     mirror: true
     crop_size: 150
     mean_file: "data/waldo_mean.binaryproto"
+	scale: 255
   }
   data_param {
     source: "data/lmdb/waldo_train_images_lmdb"
+    #source: "data/lmdb/tmp_train_lmdb"
     batch_size: 64
     backend: LMDB
   }
@@ -44,9 +46,11 @@ layer {
     mirror: false
     crop_size: 150
     mean_file: "data/waldo_mean.binaryproto"
+	scale: 255
   }
   data_param {
     source: "data/lmdb/waldo_val_images_lmdb"
+    #source: "data/lmdb/tmp_val_lmdb"
     batch_size: 50
     backend: LMDB
   }
@@ -421,14 +425,14 @@ layer {
   type: "SoftmaxWithLoss"
   bottom: "output-classify"
   bottom: "label"
-  top: "loss"
+  top: "loss-classify"
 }
 layer {
   name: "loss-bb"
   type: "EuclideanLoss"
   bottom: "output-bb"
   bottom: "gt-bb"
-  top: "loss-2"
+  top: "loss-bb"
 
   loss_weight: 2
 }

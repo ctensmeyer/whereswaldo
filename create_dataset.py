@@ -22,8 +22,13 @@ SPRITE_SHEAR = (-0.3490658503988659, 0.3490658503988659) #+- 20 in radians
 IMAGE_SCALES = [0.5, 0.75, 1, 1.25, 1.5, 2]
 CROP_SIZE = (170, 170)
 
+BLUR_PROB = 0.5
 HSV_SATURATION_SIGMA_RANGE = (0.1,1.4)
+#HSV_SATURATION_SIGMA_RANGE = (0.01,0.02)
+
+NOISE_PROB = 0.5
 NOISE_RANGE = .10
+#NOISE_RANGE = .001
 
 QUIET = False
 
@@ -297,41 +302,46 @@ def make_instances(sprite_files, crop_files, root, out_dir, percent_positive, nu
             #io.show()
 
             hsv = color.rgb2hsv(inserted)
-            addNoise(hsv[:,:,1:3], NOISE_RANGE)
-            sigma = random.uniform(*HSV_SATURATION_SIGMA_RANGE)
-            hsv[:,:,1] = filters.gaussian_filter(hsv[:,:,1], sigma)
+            if random.random() < NOISE_PROB:
+                addNoise(hsv[:,:,1:3], NOISE_RANGE)
+            if random.random() < BLUR_PROB:
+                sigma = random.uniform(*HSV_SATURATION_SIGMA_RANGE)
+                hsv[:,:,1] = filters.gaussian_filter(hsv[:,:,1], sigma)
 
             
+            imgLoc = os.path.join(positive_dir, "waldo_%d.png" % len(positive_files))
             if use_hsv:
                 img = hsv
+                rgb = color.hsv2rgb(hsv)
+                io.imsave(imgLoc, rgb)
             else:
-                img = color.hsv2rgb(hsv) #Unsure how to save HSV image
+                img = color.hsv2rgb(hsv)
+                io.imsave(imgLoc, img)
 
-            imgLoc = os.path.join(positive_dir, "waldo_%d.png" % len(positive_files))
-            io.imsave(imgLoc, img)
             positive_files.append(imgLoc)
-
-            bb = [float(x) / CROP_SIZE[0], float(y) / CROP_SIZE[1], float(xEnd) / CROP_SIZE[0], float(yEnd) / CROP_SIZE[0]]
+            bb = [float(y) / CROP_SIZE[0], float(x) / CROP_SIZE[1], float(yEnd) / CROP_SIZE[0], float(xEnd) / CROP_SIZE[1]]
             append_db(img, 1, method, np.asarray(bb, dtype=np.float))
         else:
             imgLoc = os.path.join(negative_dir, "background_%d.png" % len(negative_files))
-            shutil.copyfile(crop_fn, imgLoc)
-            negative_files.append(imgLoc)
-            
             img = io.imread(crop_fn)
 
             hsv = color.rgb2hsv(img)
-            addNoise(hsv[:,:,1:3], NOISE_RANGE)
-            sigma = random.uniform(*HSV_SATURATION_SIGMA_RANGE)
-            hsv[:,:,1] = filters.gaussian_filter(hsv[:,:,1],sigma)
+            if random.random() < NOISE_PROB:
+                addNoise(hsv[:,:,1:3], NOISE_RANGE)
+            if random.random() < BLUR_PROB:
+                sigma = random.uniform(*HSV_SATURATION_SIGMA_RANGE)
+                hsv[:,:,1] = filters.gaussian_filter(hsv[:,:,1],sigma)
 
             if use_hsv:
                 img = hsv
+                rgb = color.hsv2rgb(hsv)
+                io.imsave(imgLoc, rgb)
             else:
                 img = color.hsv2rgb(hsv)
+                io.imsave(imgLoc, img)
 
+            negative_files.append(imgLoc)
             append_db(img, 0, method, np.asarray([0, 0, 0, 0], dtype=np.float))
-
 
     return positive_files, negative_files
 
