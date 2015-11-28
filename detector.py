@@ -5,10 +5,12 @@ import cv2
 import caffe
 import numpy as np
 from PIL import Image, ImageDraw
+import skimage.color
 import argparse
 
 
-IMG_SCALES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3]
+#IMG_SCALES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3]
+IMG_SCALES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
 
 def init_caffe(args):
 	if args.gpu >= 0:
@@ -45,7 +47,7 @@ def get_im_files(args):
 def detect(im, caffenet, args):
 	sh = im.shape
 	heatmap = np.zeros( (sh[0] / args.stride + 1, sh[1] / args.stride + 1) )
-	bbs = []
+	bbs = np.zeros( (sh[0] / args.stride + 1, sh[1] / args.stride + 1, 4) )
 
 	detect_height = caffenet.blobs[args.input].data.shape[2]
 	detect_width = caffenet.blobs[args.input].data.shape[3]
@@ -57,6 +59,7 @@ def detect(im, caffenet, args):
 			caffenet.blobs[args.input].data[...] = win
 			caffenet.forward()
 			heatmap[y / args.stride, x / args.stride] = caffenet.blobs[args.output_layer].data.flatten()[1]
+			bbs[y / args.stride, x / args.stride] = caffenet.blobs[args.bb_layer].data.flatten()
 
 	return heatmap, bbs
 
@@ -73,9 +76,9 @@ def get_output_name(f, out_dir, tag):
 	return os.path.join(sdir, "%s%s" % (tag, ext))
 
 
-def draw_bb(draw, x, y, width, height, color='blue', thick=5):
+def draw_bb(draw, x, y, xEnd, yEnd, color='blue', thick=5):
 	for t in xrange(thick):
-		draw.rectangle( [x-t, y-t, x + width + t, y + height + t], outline=color)
+		draw.rectangle( [x-t, y-t, xEnd + t, yEnd + t], outline=color)
 			
 
 def save_heatmap(heatmap, size, heat_out):
@@ -101,6 +104,11 @@ def handle_image(fn, caffenet, args):
 			resample=Image.BILINEAR)
 		im_np = np.array(im.getdata()).reshape(im.size[1], im.size[0], 3)
 
+		if args.hsv:
+			im_np = skimage.color.rgb2hsv(im_np)
+		elif args.float:
+			im_np /= 255.
+
 		heatmap, bbs = detect(im_np, caffenet, args)
 
 		heat_out = get_output_name(fn, args.out_dir, "heatmap_%.2f" % scale)
@@ -109,25 +117,35 @@ def handle_image(fn, caffenet, args):
 
 		bb_out = get_output_name(fn, args.out_dir, "bb_%.2f" % scale)
 		
-		y, x = np.unravel_index(heatmap.argmax(), heatmap.shape)
-		x = x * args.stride
-		y = y * args.stride
+		if args.bbr:
+			y, x = np.unravel_index(heatmap.argmax(), heatmap.shape)
+			bb = bbs[y, x, :]
+			y = int( (y * args.stride + bb[0] * detect_height) / scale)
+			x = int( (x * args.stride + bb[1] * detect_width) / scale) 
+			yEnd = int(y + (min(bb[2], 1) * detect_height) / scale)
+			xEnd = int(x + (min(bb[3], 1) * detect_width) / scale) 
+		else:
+			y, x = np.unravel_index(heatmap.argmax(), heatmap.shape)
+			x = int(x * args.stride / scale)
+			y = int(y * args.stride / scale)
+			xEnd = int(x + detect_width / scale)
+			yEnd = int(y + detect_height / scale)
 		score = heatmap.max()
-		print scale, x, y, score 
+		#print scale, x, y, xEnd, yEnd, score
 		if score > best_detection[0]:
-			best_detection = (score, x, y, scale)
+			best_detection = (score, x, y, xEnd, yEnd, scale)
 
 		bb_im = im_original.copy()
 
 		draw = ImageDraw.Draw(bb_im)
-		draw_bb(draw, int(x / scale), int(y / scale), int(detect_width / scale), int(detect_height / scale) )
+		draw_bb(draw, x, y, xEnd, yEnd)
 		bb_im.save(bb_out)
 
-	bb_out = get_output_name(fn, args.out_dir, "bb_best_%.2f" % best_detection[3])
+	bb_out = get_output_name(fn, args.out_dir, "bb_best_%.2f" % best_detection[-1])
 
 	draw = ImageDraw.Draw(im_original)
-	score, x, y, scale = best_detection
-	draw_bb(draw, int(x / scale), int(y / scale), int(detect_width / scale), int(detect_height / scale) )
+	score, x, y, xEnd, yEnd, scale = best_detection
+	draw_bb(draw, x, y, xEnd, yEnd)
 	im_original.save(bb_out)
 
 
@@ -168,6 +186,8 @@ def get_args():
 				help="Stride of the sliding window")
 	parser.add_argument("--output-layer", type=str, default="probs",
 				help="Name of the output layer")
+	parser.add_argument("--bb-layer", type=str, default="bb",
+				help="Name of the output layer")
 
 	parser.add_argument("-m", "--mean-file", type=str, default="",
 				help="Optional mean file for input normalization")
@@ -179,6 +199,12 @@ def get_args():
 				help="Optional shift factor")
 	parser.add_argument("-i", "--input", type=str, default="data",
 				help="Name of input blob")
+	parser.add_argument("-f", "--float", default=False, action="store_true",
+				help="Scale read in images to [0-1]")
+	parser.add_argument("--hsv", default=False, action="store_true",
+				help="Convert images to HSV colorspace")
+	parser.add_argument("--bbr", default=False, action="store_true",
+				help="Do bounding box regression")
 	
 	return parser.parse_args()
 
